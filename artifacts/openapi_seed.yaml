@@ -1,0 +1,28 @@
+openapi: 3.0.3
+info:
+  title: MLOps Platform Seed API
+  version: 0.1.0
+paths:
+  /models:
+    get:
+      summary: List models
+      responses:
+        '200':
+          description: Model list
+    post:
+      summary: Register model
+      responses:
+        '201':
+          description: Model created
+  /deployments:
+    post:
+      summary: Request deployment
+      responses:
+        '202':
+          description: Deployment accepted
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy

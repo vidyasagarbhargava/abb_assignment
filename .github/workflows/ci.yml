@@ -1,0 +1,43 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: mlops, POSTGRES_PASSWORD: mlops, POSTGRES_DB: mlops_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mlops" --health-interval 5s --health-retries 10
+    strategy:
+      matrix: { python: ["3.11", "3.12"] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python }}", cache: pip }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check . && ruff format --check .
+      - run: mypy app
+      - name: Tests (SQLite)
+        run: pytest --cov=app --cov-fail-under=85
+      - name: Tests (PostgreSQL - proves partial-index and locking semantics)
+        env: { TEST_DATABASE_URL: "postgresql://mlops:mlops@localhost:5432/mlops_test" }
+        run: pytest
+      - name: Migrations apply, match models and downgrade cleanly
+        env: { MLOPS_DATABASE_URL: "postgresql://mlops:mlops@localhost:5432/mlops_test" }
+        run: alembic upgrade head && alembic check && alembic downgrade base
+      - name: Dependency vulnerability scan
+        run: pip-audit -r requirements.txt
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t mlops-backend backend
+
+  # frontend job to be added when the Angular app lands (ng lint, ng test --watch=false, ng build).
